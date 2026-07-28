@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SEAPR Property Room Count Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .glass-panel {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.9));
+      }
+    </style>
+  </head>
+  <body class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <header class="glass-panel rounded-3xl border border-slate-800/80 p-6 shadow-2xl shadow-slate-950/60 backdrop-blur">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p class="text-sm font-semibold uppercase tracking-[0.35em] text-cyan-400">SEAPR Property Room Count</p>
+            <h1 class="mt-2 text-3xl font-semibold text-white sm:text-4xl">
+              Asia Pacific Hotel Room Intelligence Dashboard
+            </h1>
+            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
+              Integrated view of room inventory across major hotel brands and channels, with country-level filtering and full-property detail access.
+            </p>
+          </div>
+
+          <div class="w-full rounded-2xl border border-slate-700/80 bg-slate-900/70 px-4 py-3 lg:max-w-xs">
+            <label for="countryFilter" class="text-sm font-medium text-slate-300">Filter by country</label>
+            <select
+              id="countryFilter"
+              class="mt-2 w-full rounded-xl border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400"
+            >
+              <option value="all">All countries</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <div id="errorBanner" class="mt-4 hidden rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm font-medium text-rose-300"></div>
+
+      <section class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <article class="glass-panel rounded-2xl border border-slate-800/80 p-5 shadow-lg shadow-slate-950/40">
+          <p class="text-sm text-slate-400">Hotels analyzed</p>
+          <p id="kpiHotels" class="mt-3 text-3xl font-semibold text-white">—</p>
+          <p class="mt-2 text-sm text-slate-400">Properties in the current view</p>
+        </article>
+
+        <article class="glass-panel rounded-2xl border border-slate-800/80 p-5 shadow-lg shadow-slate-950/40">
+          <p class="text-sm text-slate-400">Oracle total rooms</p>
+          <p id="kpiOracle" class="mt-3 text-3xl font-semibold text-cyan-300">—</p>
+          <p class="mt-2 text-sm text-slate-400">Inventory across Oracle channel</p>
+        </article>
+
+        <article class="glass-panel rounded-2xl border border-slate-800/80 p-5 shadow-lg shadow-slate-950/40">
+          <p class="text-sm text-slate-400">Agoda total rooms</p>
+          <p id="kpiAgoda" class="mt-3 text-3xl font-semibold text-violet-300">—</p>
+          <p class="mt-2 text-sm text-slate-400">Inventory across Agoda channel</p>
+        </article>
+
+        <article class="glass-panel rounded-2xl border border-slate-800/80 p-5 shadow-lg shadow-slate-950/40">
+          <p class="text-sm text-slate-400">Oracle vs Agoda gap</p>
+          <p id="kpiDelta" class="mt-3 text-3xl font-semibold text-amber-300">—</p>
+          <p class="mt-2 text-sm text-slate-400">Oracle rooms minus Agoda rooms</p>
+        </article>
+      </section>
+
+      <section class="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <article class="glass-panel rounded-3xl border border-slate-800/80 p-5 shadow-xl shadow-slate-950/40">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-white">Top 10 properties by room inventory</h2>
+              <p class="mt-1 text-sm text-slate-400">Oracle vs Agoda comparison for the selected view</p>
+            </div>
+          </div>
+          <div class="mt-4 h-80">
+            <canvas id="inventoryChart"></canvas>
+          </div>
+        </article>
+
+        <article class="glass-panel rounded-3xl border border-slate-800/80 p-5 shadow-xl shadow-slate-950/40">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-white">Channel mix overview</h2>
+              <p class="mt-1 text-sm text-slate-400">Oracle, Agoda, Expedia and Trip room share</p>
+            </div>
+          </div>
+          <div class="mt-4 h-80">
+            <canvas id="mixChart"></canvas>
+          </div>
+        </article>
+      </section>
+
+      <section class="mt-6">
+        <article class="glass-panel rounded-3xl border border-slate-800/80 p-5 shadow-xl shadow-slate-950/40">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-white">Country room trend</h2>
+              <p class="mt-1 text-sm text-slate-400">Total room inventory across the leading countries in the current view</p>
+            </div>
+          </div>
+          <div class="mt-4 h-80">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </article>
+      </section>
+
+      <section class="mt-6 rounded-3xl border border-slate-800/80 bg-slate-900/70 p-5 shadow-xl shadow-slate-950/40">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-white">Property detail table</h2>
+            <p class="mt-1 text-sm text-slate-400">All raw rows are rendered in a scrollable table for complete operational review.</p>
+          </div>
+          <p id="tableSummary" class="text-sm text-slate-400">Loading data…</p>
+        </div>
+
+        <div class="mt-4 overflow-auto rounded-2xl border border-slate-800">
+          <table class="min-w-full divide-y divide-slate-800 text-sm text-slate-200">
+            <thead class="bg-slate-800/90 text-left text-slate-300">
+              <tr>
+                <th class="whitespace-nowrap px-4 py-3 font-medium">Hotel Name</th>
+                <th class="whitespace-nowrap px-4 py-3 font-medium">Country</th>
+                <th class="whitespace-nowrap px-4 py-3 font-medium">Oracle</th>
+                <th class="whitespace-nowrap px-4 py-3 font-medium">Agoda</th>
+                <th class="whitespace-nowrap px-4 py-3 font-medium">Expedia</th>
+                <th class="whitespace-nowrap px-4 py-3 font-medium">Trip</th>
+                <th class="whitespace-nowrap px-4 py-3 font-medium">Address</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody" class="divide-y divide-slate-800 bg-slate-900/70"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const csvPath = './SEAPR Room Count_test.csv';
+      const countryFilter = document.getElementById('countryFilter');
+      const errorBanner = document.getElementById('errorBanner');
+      const tableBody = document.getElementById('tableBody');
+      const tableSummary = document.getElementById('tableSummary');
+
+      const metricEls = {
+        hotels: document.getElementById('kpiHotels'),
+        oracle: document.getElementById('kpiOracle'),
+        agoda: document.getElementById('kpiAgoda'),
+        delta: document.getElementById('kpiDelta')
+      };
+
+      let rows = [];
+      let filteredRows = [];
+      let chartInstances = {};
+
+      function showError(message) {
+        errorBanner.classList.remove('hidden');
+        errorBanner.textContent = `Unable to load the CSV data: ${message}`;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function parseNumber(value) {
+        const cleaned = String(value ?? '').replace(/,/g, '').trim();
+        const parsed = Number(cleaned);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+
+      function normalizeCountry(value) {
+        return String(value ?? '').replace(/\s+/g, ' ').trim();
+      }
+
+      function deriveCountry(row) {
+        const fromColumn = normalizeCountry(row.Country);
+        if (fromColumn) {
+          return fromColumn;
+        }
+
+        const raw = normalizeCountry(row.Address);
+        if (!raw) {
+          return '';
+        }
+
+        const parts = raw
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean);
+        return parts[parts.length - 1] || '';
+      }
+
+      function buildCountryOptions() {
+        const countries = [...new Set(rows.map((row) => row.country).filter(Boolean))].sort();
+        countryFilter.innerHTML = '<option value="all">All countries</option>' +
+          countries
+            .map((country) => `<option value="${escapeHtml(country)}">${escapeHtml(country)}</option>`)
+            .join('');
+      }
+
+      function applyFilter() {
+        const selected = countryFilter.value;
+        filteredRows = selected === 'all'
+          ? rows
+          : rows.filter((row) => row.country === selected);
+        renderMetrics();
+        renderCharts();
+        renderTable();
+      }
+
+      function renderMetrics() {
+        const hotels = filteredRows.length;
+        const oracle = filteredRows.reduce((sum, row) => sum + parseNumber(row['Oracle(rooms)']), 0);
+        const agoda = filteredRows.reduce((sum, row) => sum + parseNumber(row['Agoda(rooms)']), 0);
+        const delta = oracle - agoda;
+
+        metricEls.hotels.textContent = hotels.toLocaleString();
+        metricEls.oracle.textContent = oracle.toLocaleString();
+        metricEls.agoda.textContent = agoda.toLocaleString();
+        metricEls.delta.textContent = `${delta >= 0 ? '+' : ''}${delta.toLocaleString()}`;
+        metricEls.delta.className = `mt-3 text-3xl font-semibold ${delta >= 0 ? 'text-emerald-300' : 'text-rose-300'}`;
+      }
+
+      function renderCharts() {
+        const topRows = filteredRows
+          .slice()
+          .sort((a, b) => {
+            const left = parseNumber(a['Oracle(rooms)']) + parseNumber(a['Agoda(rooms)']);
+            const right = parseNumber(b['Oracle(rooms)']) + parseNumber(b['Agoda(rooms)']);
+            return right - left;
+          })
+          .slice(0, 10);
+
+        const labels = topRows.map((row) => row['Hotel Name'].trim());
+        const oracleValues = topRows.map((row) => parseNumber(row['Oracle(rooms)']));
+        const agodaValues = topRows.map((row) => parseNumber(row['Agoda(rooms)']));
+
+        const inventoryCtx = document.getElementById('inventoryChart');
+        if (chartInstances.inventory) {
+          chartInstances.inventory.destroy();
+        }
+        chartInstances.inventory = new Chart(inventoryCtx, {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Oracle',
+                data: oracleValues,
+                backgroundColor: 'rgba(34, 211, 238, 0.85)',
+                borderRadius: 6
+              },
+              {
+                label: 'Agoda',
+                data: agodaValues,
+                backgroundColor: 'rgba(167, 139, 250, 0.85)',
+                borderRadius: 6
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                labels: { color: '#cbd5e1' }
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: '#cbd5e1' },
+                grid: { color: 'rgba(148, 163, 184, 0.2)' }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: '#cbd5e1' },
+                grid: { color: 'rgba(148, 163, 184, 0.2)' }
+              }
+            }
+          }
+        });
+
+        const oracleTotal = filteredRows.reduce((sum, row) => sum + parseNumber(row['Oracle(rooms)']), 0);
+        const agodaTotal = filteredRows.reduce((sum, row) => sum + parseNumber(row['Agoda(rooms)']), 0);
+        const expediaTotal = filteredRows.reduce((sum, row) => sum + parseNumber(row['Expedia(rooms)']), 0);
+        const tripTotal = filteredRows.reduce((sum, row) => sum + parseNumber(row['Trip(rooms)']), 0);
+
+        const mixCtx = document.getElementById('mixChart');
+        if (chartInstances.mix) {
+          chartInstances.mix.destroy();
+        }
+        chartInstances.mix = new Chart(mixCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Oracle', 'Agoda', 'Expedia', 'Trip'],
+            datasets: [
+              {
+                data: [oracleTotal || 1, agodaTotal || 1, expediaTotal || 1, tripTotal || 1],
+                backgroundColor: ['rgba(34, 211, 238, 0.85)', 'rgba(167, 139, 250, 0.85)', 'rgba(244, 114, 182, 0.85)', 'rgba(250, 204, 21, 0.85)'],
+                borderColor: 'rgba(15, 23, 42, 1)',
+                borderWidth: 2
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: '#cbd5e1' }
+              }
+            }
+          }
+        });
+
+        const countryTotals = filteredRows.reduce((acc, row) => {
+          const country = row.country || 'Unknown';
+          const total = parseNumber(row['Oracle(rooms)']) + parseNumber(row['Agoda(rooms)']) + parseNumber(row['Expedia(rooms)']) + parseNumber(row['Trip(rooms)']);
+          acc[country] = (acc[country] || 0) + total;
+          return acc;
+        }, {});
+
+        const trendEntries = Object.entries(countryTotals)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10);
+        const trendLabels = trendEntries.map(([country]) => country);
+        const trendValues = trendEntries.map(([, total]) => total);
+
+        const trendCtx = document.getElementById('trendChart');
+        if (chartInstances.trend) {
+          chartInstances.trend.destroy();
+        }
+        chartInstances.trend = new Chart(trendCtx, {
+          type: 'line',
+          data: {
+            labels: trendLabels,
+            datasets: [
+              {
+                label: 'Total rooms',
+                data: trendValues,
+                borderColor: 'rgba(96, 165, 250, 0.95)',
+                backgroundColor: 'rgba(96, 165, 250, 0.25)',
+                pointBackgroundColor: 'rgba(34, 211, 238, 1)',
+                pointBorderColor: 'rgba(15, 23, 42, 1)',
+                fill: true,
+                tension: 0.3
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                labels: { color: '#cbd5e1' }
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: '#cbd5e1' },
+                grid: { color: 'rgba(148, 163, 184, 0.2)' }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: '#cbd5e1' },
+                grid: { color: 'rgba(148, 163, 184, 0.2)' }
+              }
+            }
+          }
+        });
+      }
+
+      function renderTable() {
+        tableSummary.textContent = `${filteredRows.length} properties shown`;
+        tableBody.innerHTML = filteredRows.map((row) => `
+          <tr class="hover:bg-slate-800/70">
+            <td class="whitespace-nowrap px-4 py-3 font-medium text-white">${escapeHtml(row['Hotel Name'] || '')}</td>
+            <td class="whitespace-nowrap px-4 py-3">${escapeHtml(row.country || '')}</td>
+            <td class="whitespace-nowrap px-4 py-3">${escapeHtml(row['Oracle(rooms)'] || '')}</td>
+            <td class="whitespace-nowrap px-4 py-3">${escapeHtml(row['Agoda(rooms)'] || '')}</td>
+            <td class="whitespace-nowrap px-4 py-3">${escapeHtml(row['Expedia(rooms)'] || '')}</td>
+            <td class="whitespace-nowrap px-4 py-3">${escapeHtml(row['Trip(rooms)'] || '')}</td>
+            <td class="max-w-[360px] px-4 py-3 text-slate-300">${escapeHtml(row.Address || '')}</td>
+          </tr>
+        `).join('');
+      }
+
+      async function loadData() {
+        try {
+          const response = await fetch(csvPath);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const text = await response.text();
+          const parsed = Papa.parse(text, {
+            header: true,
+            skipEmptyLines: true
+          });
+
+          if (parsed.errors && parsed.errors.length) {
+            console.warn('CSV warnings', parsed.errors);
+          }
+
+          rows = parsed.data
+            .filter((row) => row['Hotel Name'] && row['Hotel Name'].trim())
+            .map((row) => ({
+              ...row,
+              country: deriveCountry(row)
+            }));
+
+          buildCountryOptions();
+          applyFilter();
+          errorBanner.classList.add('hidden');
+        } catch (error) {
+          showError(error.message || 'Unknown error');
+          tableSummary.textContent = 'Unable to load data';
+        }
+      }
+
+      countryFilter.addEventListener('change', applyFilter);
+      loadData();
+    </script>
+  </body>
+</html>
