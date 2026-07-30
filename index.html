@@ -101,7 +101,7 @@
         </article>
       </section>
 
-      <section class="mt-6">
+      <section class="mt-6 grid gap-6 xl:grid-cols-2">
         <article class="glass-panel rounded-3xl border border-slate-800/80 p-5 shadow-xl shadow-slate-950/40">
           <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -111,6 +111,18 @@
           </div>
           <div class="mt-4 h-80">
             <canvas id="trendChart"></canvas>
+          </div>
+        </article>
+
+        <article class="glass-panel rounded-3xl border border-slate-800/80 p-5 shadow-xl shadow-slate-950/40">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-white">OTA room breakdown</h2>
+              <p class="mt-1 text-sm text-slate-400">Oracle, Agoda, Expedia and Trip room totals for the current country selection</p>
+            </div>
+          </div>
+          <div class="mt-4 h-80">
+            <canvas id="otaBreakdownChart"></canvas>
           </div>
         </article>
       </section>
@@ -358,6 +370,52 @@
                 pointBorderColor: 'rgba(15, 23, 42, 1)',
                 fill: true,
                 tension: 0.3
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                labels: { color: '#cbd5e1' }
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: '#cbd5e1' },
+                grid: { color: 'rgba(148, 163, 184, 0.2)' }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: '#cbd5e1' },
+                grid: { color: 'rgba(148, 163, 184, 0.2)' }
+              }
+            }
+          }
+        });
+
+        const otaTotals = {
+          Oracle: filteredRows.reduce((sum, row) => sum + parseNumber(row['Oracle(rooms)']), 0),
+          Agoda: filteredRows.reduce((sum, row) => sum + parseNumber(row['Agoda(rooms)']), 0),
+          Expedia: filteredRows.reduce((sum, row) => sum + parseNumber(row['Expedia(rooms)']), 0),
+          Trip: filteredRows.reduce((sum, row) => sum + parseNumber(row['Trip(rooms)']), 0)
+        };
+
+        const otaBreakdownCtx = document.getElementById('otaBreakdownChart');
+        if (chartInstances.otaBreakdown) {
+          chartInstances.otaBreakdown.destroy();
+        }
+        chartInstances.otaBreakdown = new Chart(otaBreakdownCtx, {
+          type: 'bar',
+          data: {
+            labels: ['Oracle', 'Agoda', 'Expedia', 'Trip'],
+            datasets: [
+              {
+                label: 'Room count',
+                data: [otaTotals.Oracle, otaTotals.Agoda, otaTotals.Expedia, otaTotals.Trip],
+                backgroundColor: ['rgba(34, 211, 238, 0.85)', 'rgba(167, 139, 250, 0.85)', 'rgba(244, 114, 182, 0.85)', 'rgba(250, 204, 21, 0.85)'],
+                borderRadius: 6
               }
             ]
           },
